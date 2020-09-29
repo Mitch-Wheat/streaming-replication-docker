@@ -9,8 +9,9 @@ psql -U postgres -c "SET password_encryption = 'scram-sha-256'; CREATE ROLE $REP
 cat >> ${PGDATA}/postgresql.conf <<EOF
 listen_addresses= '*'
 wal_level = replica
-max_wal_senders = 2
+max_wal_senders = 3
 max_replication_slots = 2
+wal_keep_segments = 10
 synchronous_commit = ${SYNCHRONOUS_COMMIT}
 EOF
 
@@ -62,7 +63,7 @@ do
     # If docker is starting the containers simultaneously, the backup may encounter the primary amidst a restart.
     # Retry until we can make contact.
     sleep 1
-    echo "Retrying backup . . ."
+    echo "Retrying backup ..."
 done
 
 # Remove pg pass file -- it is not needed after backup is restored
