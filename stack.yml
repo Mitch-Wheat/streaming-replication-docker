@@ -8,11 +8,11 @@ services:
     environment:
         REPLICATION_SUBNET: '10.0.0.0/24'
     ports:
-        - 5432:5432
+        - 6000:5432
 
   timescale-replica:
     image: timescale-replication:latest
     env_file:
         - replica.env
     ports:
-        - 5433:5432
+        - 6001:5432

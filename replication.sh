@@ -14,7 +14,7 @@ max_replication_slots = 2
 synchronous_commit = ${SYNCHRONOUS_COMMIT}
 EOF
 
-# Add synchronous standby names if we're in one of the synchronous commit modes
+# Add synchronous standby names if we're in one of the synchronous commit modes 
 if [[ "${SYNCHRONOUS_COMMIT}" =~ ^(on|remote_write|remote_apply)$ ]]; then
 cat >> ${PGDATA}/postgresql.conf <<EOF
 synchronous_standby_names = '1 (${REPLICA_NAME})'
@@ -39,6 +39,12 @@ psql -U postgres -c "SELECT * FROM pg_create_physical_replication_slot('${REPLIC
 # CONFIGURE REPLICA
 else
 
+# Add replication settings to replica postgres conf
+cat >> ${PGDATA}/postgresql.conf <<EOF
+primary_conninfo = 'host=${REPLICATE_FROM} port=5432 user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} application_name=${REPLICA_NAME}'
+primary_slot_name = '${REPLICA_NAME}_slot'
+EOF
+
 # Stop postgres instance and clear out PGDATA
 pg_ctl -D ${PGDATA} -m fast -w stop
 rm -rf ${PGDATA}
@@ -51,10 +57,10 @@ chown postgres:postgres ~/.pgpass.conf
 chmod 0600 ~/.pgpass.conf
 
 # Backup replica from the primary
-until PGPASSFILE=~/.pgpass.conf pg_basebackup -h ${REPLICATE_FROM} -D ${PGDATA} -U ${POSTGRES_USER} -vP -w
+until PGPASSFILE=~/.pgpass.conf pg_basebackup -h ${REPLICATE_FROM} -D ${PGDATA} -U ${POSTGRES_USER} -Fp -Xs -vP -w -R
 do
-    # If docker is starting the containers simultaneously, the backup may encounter
-    # the primary amidst a restart. Retry until we can make contact.
+    # If docker is starting the containers simultaneously, the backup may encounter the primary amidst a restart.
+    # Retry until we can make contact.
     sleep 1
     echo "Retrying backup . . ."
 done
@@ -62,16 +68,9 @@ done
 # Remove pg pass file -- it is not needed after backup is restored
 rm ~/.pgpass.conf
 
-# Create the recovery.conf file so the backup knows to start in recovery mode
-cat > ${PGDATA}/recovery.conf <<EOF
-standby_mode = on
-primary_conninfo = 'host=${REPLICATE_FROM} port=5432 user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} application_name=${REPLICA_NAME}'
-primary_slot_name = '${REPLICA_NAME}_slot'
-EOF
-
-# Ensure proper permissions on recovery.conf
-chown postgres:postgres ${PGDATA}/recovery.conf
-chmod 0600 ${PGDATA}/recovery.conf
+# Ensure proper permissions on recovery.signal
+chown postgres:postgres ${PGDATA}/recovery.signal
+chmod 0600 ${PGDATA}/recovery.signal
 
 pg_ctl -D ${PGDATA} -w start
 
